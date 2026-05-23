@@ -7,3 +7,8 @@
 - `bump-version.sh`: правит `version.v` вместо `main.v`, после обновления файлов делает
   `git commit -m "chore: bump version to X.Y.Z"` и `git tag -a "vX.Y.Z"`
 - Docker-сборка использует закоммиченный `version.v` без изменений
+
+## 2026-05-23 — Формат заголовка окна
+
+- Формат заголовка: `HOST: FOLDER -- NAME (i/N)` вместо `NAME (i/N) — FOLDER`
+- Изображение выровнено влево с отступом 20px
