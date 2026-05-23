@@ -41,3 +41,11 @@
 
 - `load_target_folders_at`: относительные пути резолвятся относительно папки с .target.folders
 - Фильтрация комментариев: `l.starts_with('#')` после `trim_space()` (эквивалент `^\s*#.*`)
+
+## 2026-05-23 — Приоритетная цепочка .target.folders
+
+- Низший приоритет: `~/.config/simple-pic-viewer/.target.folders`
+- Выше: `.target.folders` в CWD
+- Выше: `.target.folders` в промежуточных директориях на пути к start_dir
+- Высший приоритет: `.target.folders` в start_dir
+- Позлементное слияние: каждый следующий файл перезаписывает dir[0], dir[1] и т.д.
