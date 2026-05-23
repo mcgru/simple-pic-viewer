@@ -185,6 +185,10 @@ fn on_key_press(widget voidptr, event voidptr, data voidptr) int {
 @[export: 'on_dialog_key']
 fn on_dialog_key(dlg voidptr, event voidptr, list_box voidptr) int {
 	keyval := get_keyval(event)
+	if keyval == u32(gdk_key_return) {
+		C.gtk_dialog_response(dlg, copy_response_id)
+		return 1
+	}
 	if keyval >= 49 && keyval <= 57 {
 		idx := int(keyval - 49)
 		if idx < app.dialog_rows.len {
