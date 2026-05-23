@@ -511,12 +511,46 @@ fn main() {
 
 	start_dir := if os.args.len > 1 { os.args[1] } else { '.' }
 
-		// .target.folders: try start_dir first, then CWD
-	target_folders := load_target_folders_at(start_dir) or {
-		load_target_folders() or { []string{} }
+	// Priority chain: lowest → highest. Each step overwrites by index.
+
+	// 1. ~/.config/simple-pic-viewer/.target.folders
+	home_target := load_target_folders_at(config_dir()) or { []string{} }
+	if home_target.len > 0 {
+		merge_dirs(mut app.config.destination_dirs, home_target)
 	}
-	if target_folders.len > 0 {
-		app.config.destination_dirs = target_folders
+
+	// 2. CWD/.target.folders
+	cwd_target := load_target_folders() or { []string{} }
+	if cwd_target.len > 0 {
+		merge_dirs(mut app.config.destination_dirs, cwd_target)
+	}
+
+	// 3. Walk intermediate dirs from CWD to start_dir
+	abs_cwd := os.real_path(os.getwd())
+	abs_start := os.real_path(start_dir)
+	if abs_start != abs_cwd && abs_start.len > abs_cwd.len && abs_start[..abs_cwd.len] == abs_cwd {
+		mut rest := abs_start[abs_cwd.len..]
+		rest = rest.trim_left('/')
+		mut prev := ''
+		for seg in rest.split('/') {
+			prev = os.join_path(prev, seg)
+			walk_path := os.join_path(abs_cwd, prev)
+			if walk_path == abs_start {
+				break
+			}
+			step_target := load_target_folders_at(walk_path) or { []string{} }
+			if step_target.len > 0 {
+				merge_dirs(mut app.config.destination_dirs, step_target)
+			}
+		}
+	}
+
+	// 4. start_dir/.target.folders (highest)
+	if abs_start != abs_cwd {
+		dir_target := load_target_folders_at(start_dir) or { []string{} }
+		if dir_target.len > 0 {
+			merge_dirs(mut app.config.destination_dirs, dir_target)
+		}
 	}
 
 	load_dir(start_dir)

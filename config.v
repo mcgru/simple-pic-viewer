@@ -139,6 +139,20 @@ fn init_target_file(conf AppConfig) ! {
 	}
 }
 
+
+// Merge override dirs into dest element-by-element.
+// overrides[0] replaces dest[0], overrides[1] replaces dest[1], etc.
+// Extra entries in overrides are appended.
+fn merge_dirs(mut dest []string, overrides []string) {
+	for i, dir in overrides {
+		if i < dest.len {
+			dest[i] = dir
+		} else {
+			dest << dir
+		}
+	}
+}
+
 fn expand_path(path string) string {
 	if path == '~' {
 		return os.home_dir()
