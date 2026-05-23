@@ -93,9 +93,17 @@ const gdk_key_right = 65363
 const gdk_key_escape = 65307
 const gdk_key_return = 65293
 const gdk_key_backspace = 65288
+const gdk_key_f5 = 65469
+const gdk_key_f6 = 65470
 const gtk_align_start = 1
 const gtk_selection_single = 1
 const css_provider_priority = 800
+
+// Cyrillic keyvals (match Unicode codepoints)
+const cyrillic_capital_es = 1057
+const cyrillic_small_es = 1089
+const cyrillic_capital_soft = 1068
+const cyrillic_small_soft = 1100
 
 // ============================================================
 // Application state
@@ -539,8 +547,8 @@ Options:
 
 Keys:
   ← →             Previous / next image
-  C               Copy (link) current image to selected folder
-  M               Move current image to selected folder
+  C / С / F5       Copy (link) current image to selected folder
+  M / Ь / F6       Move current image to selected folder
   Esc             Quit
   Enter           Enter a directory (when directory navigation is enabled)
   Backspace       Go up to parent directory
