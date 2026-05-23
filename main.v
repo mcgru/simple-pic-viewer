@@ -292,18 +292,17 @@ fn show_current_image() {
 	}
 
 	filename := app.files[app.cur_index]
-	host := os.hostname() or { '?' }
 	folder := if app.current_dir != '' { app.current_dir } else { '.' }
 	idx_str := '(${app.cur_index + 1}/${app.files.len})'
 
 	if os.is_dir(filename) {
 		base := os.base(filename)
-		title := '   ${host}: ${folder} -- 📁 ${base}/ ${idx_str}'
+		title := '   ${folder} ${idx_str} -- ${base}'
 		C.gtk_window_set_title(app.window, &char(title.str))
 		C.gtk_image_clear(app.image)
 	} else {
 		base := os.base(filename)
-		title := '   ${host}: ${folder} -- ${base} ${idx_str}'
+		title := '   ${folder} ${idx_str} -- ${base}'
 		C.gtk_window_set_title(app.window, &char(title.str))
 
 		pixbuf := C.gdk_pixbuf_new_from_file_at_scale(
