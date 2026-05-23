@@ -505,13 +505,16 @@ fn main() {
 
 	app.config = load_config()
 
-	// .target.folders overrides TGT_FLDR_* from .env
-	target_folders := load_target_folders() or { []string{} }
+	start_dir := if os.args.len > 1 { os.args[1] } else { '.' }
+
+		// .target.folders: try start_dir first, then CWD
+	target_folders := load_target_folders_at(start_dir) or {
+		load_target_folders() or { []string{} }
+	}
 	if target_folders.len > 0 {
 		app.config.destination_dirs = target_folders
 	}
 
-	start_dir := if os.args.len > 1 { os.args[1] } else { '.' }
 	load_dir(start_dir)
 
 	C.gtk_init(voidptr(0), voidptr(0))

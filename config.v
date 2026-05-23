@@ -88,10 +88,9 @@ fn save_config(conf AppConfig) {
 
 const target_filename = '.target.folders'
 
-// Load folder list from .target.folders (current directory).
-// Overrides the TGT_FLDR_* from .env if the file exists.
-fn load_target_folders() ![]string {
-	data := os.read_file(os.join_path(os.getwd(), target_filename)) or {
+// Load folder list from .target.folders in a specific directory.
+fn load_target_folders_at(dir string) ![]string {
+	data := os.read_file(os.join_path(dir, target_filename)) or {
 		return err
 	}
 
@@ -107,6 +106,12 @@ fn load_target_folders() ![]string {
 		return error('.target.folders is empty')
 	}
 	return folders
+}
+
+// Load folder list from .target.folders in the current directory.
+// Overrides the TGT_FLDR_* from .env if the file exists.
+fn load_target_folders() ![]string {
+	return load_target_folders_at(os.getwd())
 }
 
 // Create .target.folders from the current config's destination_dirs.
