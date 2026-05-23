@@ -13,9 +13,11 @@
 - Формат заголовка: `   HOST: FOLDER -- NAME (i/N)` (с отступом 3 пробела)
 - Откат: изображение снова по центру, без выравнивания влево
 
-## 2026-05-23 — Makefile
+## 2026-05-23 — Makefile + calc-version.sh
 
 - Создан `Makefile` с целями: build, docker, docker-static, bump, deb, commit
 - По умолчанию (`make`) выводит список доступных целей
-- `make bump VER=X.Y.Z` — запуск bump-version.sh с указанием версии
+- `make bump` — автоматический расчёт версии через conventional commits
+- `make bump X.Y.Z` — явное указание версии
+- `calc-version.sh` — анализирует коммиты с последнего тэга (`feat:` → minor, `fix:`/прочее → patch)
 - `make deb` — сборка .deb (предварительно собирает бинарник)
