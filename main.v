@@ -481,7 +481,7 @@ fn main() {
 	}
 
 	if os.args.contains('-V') || os.args.contains('--version') {
-		println('simple-pic-viewer 1.0.0')
+		println('simple-pic-viewer ${app_version}')
 		return
 	}
 

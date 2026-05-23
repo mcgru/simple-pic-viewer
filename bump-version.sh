@@ -34,9 +34,20 @@ echo "  makedeb.sh: PKG_VERSION=\"${NEW_VER}\""
 sed -i 's/^Version: '"${OLD_VER}"'$/Version: '"${NEW_VER}"'/' "${SCRIPT_DIR}/packaging/DEBIAN/control"
 echo "  packaging/DEBIAN/control: Version: ${NEW_VER}"
 
-# Update main.v — the --version output
-sed -i 's/println('\''simple-pic-viewer '"${OLD_VER}"\''/println('\''simple-pic-viewer '"${NEW_VER}"\'"/" "${SCRIPT_DIR}/main.v"
-echo "  main.v: version string"
+# Update version.v
+sed -i "s/^pub const app_version = '${OLD_VER}'$/pub const app_version = '${NEW_VER}'/" "${SCRIPT_DIR}/version.v"
+echo "  version.v: app_version = ${NEW_VER}"
+
+# Commit and tag
+echo
+echo "==> Committing version bump..."
+cd "${SCRIPT_DIR}"
+git add -A
+git commit -m "chore: bump version to ${NEW_VER}"
+
+echo "==> Tagging v${NEW_VER}..."
+git tag -a "v${NEW_VER}" -m "version ${NEW_VER}"
 
 echo
-echo "Done. Verify with: grep -rn '${OLD_VER}\\|${NEW_VER}' main.v makedeb.sh packaging/DEBIAN/control"
+echo "Done."
+echo "Verify with: grep -rn '${OLD_VER}\\|${NEW_VER}' version.v makedeb.sh packaging/DEBIAN/control"
