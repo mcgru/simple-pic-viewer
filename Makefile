@@ -8,6 +8,7 @@ help:
 	@echo '  make bump [X.Y.Z]  — calculate version from commits, or use explicit'
 	@echo '  make deb           — build .deb package (builds binary first)'
 	@echo '  make commit msg="..."  — git add -A && git commit'
+	@echo '  make install       — install binary to ~/.local/bin'
 
 build:
 	./build.sh
@@ -40,3 +41,21 @@ deb: build
 commit:
 	git add -A
 	@test -n "$(msg)" && git commit -m "$(msg)" || git commit -m "quick update"
+
+install: build
+	@if [ "$$(id -u)" -eq 0 ]; then \
+		DEST="/usr/local/bin"; \
+	else \
+		DEST="$$HOME/.local/bin"; \
+		mkdir -p "$$DEST"; \
+	fi; \
+	cp simple-pic-viewer "$$DEST/simple-pic-viewer" && \
+	chmod 755 "$$DEST/simple-pic-viewer" && \
+	echo "==> Installed: $$DEST/simple-pic-viewer" && \
+	if [ "$$(id -u)" -ne 0 ] && ! echo "$$PATH" | grep -q "$$HOME/.local/bin"; then \
+		echo "=== Hint: add ~/.local/bin to your PATH ==="; \
+		echo '  export PATH="$$HOME/.local/bin:$$PATH"'; \
+		if ! grep -qs "HOME/.local/bin" "$$HOME/.bashrc" 2>/dev/null; then \
+			echo "  Or run: echo 'export PATH=\"\$$HOME/.local/bin:\$$PATH\"' >> ~/.bashrc"; \
+		fi; \
+	fi

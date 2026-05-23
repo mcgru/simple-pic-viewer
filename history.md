@@ -49,3 +49,8 @@
 - Выше: `.target.folders` в промежуточных директориях на пути к start_dir
 - Высший приоритет: `.target.folders` в start_dir
 - Позлементное слияние: каждый следующий файл перезаписывает dir[0], dir[1] и т.д.
+
+## 2026-05-23 — make install
+
+- `make install`: копирует бинарник в `~/.local/bin` (или `/usr/local/bin` с sudo)
+- Если `~/.local/bin` нет в PATH — подсказка с командой для `.bashrc`
