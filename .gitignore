@@ -1,0 +1,17 @@
+# compiled binary
+simple-pic-viewer
+
+# .deb packages
+*.deb
+
+# extracted portable bundle
+portable/
+
+# downloaded packages
+dloads/
+
+# claude code session state
+.claude/
+
+# downloaded artifacts
+latest-releases.yaml

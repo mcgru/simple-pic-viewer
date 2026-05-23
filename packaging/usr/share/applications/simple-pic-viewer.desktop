@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Simple Pic Viewer
+Comment=Minimal GTK3 image viewer
+Exec=simple-pic-viewer %F
+Icon=simple-pic-viewer
+Categories=Graphics;Viewer;
+Terminal=false
+MimeType=image/png;image/jpeg;image/tiff;

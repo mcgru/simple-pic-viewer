@@ -1,0 +1,10 @@
+Package: simple-pic-viewer
+Version: 1.0.0
+Section: graphics
+Priority: optional
+Architecture: amd64
+Depends: libgtk-3-0 (>= 3.24), libgdk-pixbuf-2.0-0 (>= 2.42)
+Maintainer: Simple Pic Viewer Team
+Description: Minimal GTK3 image viewer with keyboard navigation
+ Supports PNG, JPEG, TIFF images. Left/right navigation,
+ copy-to-folder (link/move), configurable target dirs.

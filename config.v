@@ -1,0 +1,140 @@
+module main
+
+import os
+
+pub struct AppConfig {
+pub mut:
+	destination_dirs []string
+	copy_method      string
+	move_method      string
+}
+
+fn config_dir() string {
+	return os.join_path(os.home_dir(), '.config', 'simple-pic-viewer')
+}
+
+fn config_path() string {
+	return os.join_path(config_dir(), '.env')
+}
+
+fn load_config() AppConfig {
+	path := config_path()
+
+	// First run — create .env with defaults
+	if !os.exists(path) {
+		conf := AppConfig{
+			destination_dirs: ['~/Pictures', '~/Desktop']
+			copy_method: 'cp'
+			move_method: 'mv'
+		}
+		save_config(conf)
+		return conf
+	}
+
+	mut conf := AppConfig{
+		copy_method: 'cp'
+		move_method: 'mv'
+	}
+
+	data := os.read_file(path) or { return conf }
+
+	for raw_line in data.split('\n') {
+		l := raw_line.trim_space()
+		if l == '' || l.starts_with('#') {
+			continue
+		}
+
+		parts := l.split('=')
+		if parts.len < 2 {
+			continue
+		}
+
+		key := parts[0].trim_space()
+		val := parts[1..].join('=').trim_space()
+
+		if key.starts_with('TGT_FLDR_') {
+			conf.destination_dirs << val
+		} else if key == 'COPY_METHOD' {
+			conf.copy_method = val
+		} else if key == 'MOVE_METHOD' {
+			conf.move_method = val
+		}
+	}
+
+	// If user wiped all TGT_FLDR lines — keep the list empty
+	return conf
+}
+
+fn save_config(conf AppConfig) {
+	os.mkdir_all(config_dir()) or { return }
+
+	mut lines := []string{}
+	lines << '# Simple Pic Viewer configuration'
+	lines << '#'
+	lines << '# Destination folders (add as many as needed):'
+	for i, dir in conf.destination_dirs {
+		lines << 'TGT_FLDR_${i + 1}=${dir}'
+	}
+	lines << ''
+	lines << '# Copy method: cp | link'
+	lines << 'COPY_METHOD=${conf.copy_method}'
+	lines << ''
+	lines << '# Move method: mv'
+	lines << 'MOVE_METHOD=${conf.move_method}'
+	lines << ''
+
+	os.write_file(config_path(), lines.join('\n')) or { return }
+}
+
+const target_filename = '.target.folders'
+
+// Load folder list from .target.folders (current directory).
+// Overrides the TGT_FLDR_* from .env if the file exists.
+fn load_target_folders() ![]string {
+	data := os.read_file(os.join_path(os.getwd(), target_filename)) or {
+		return err
+	}
+
+	mut folders := []string{}
+	for line in data.split('\n') {
+		l := line.trim_space()
+		if l != '' && !l.starts_with('#') {
+			folders << l
+		}
+	}
+
+	if folders.len == 0 {
+		return error('.target.folders is empty')
+	}
+	return folders
+}
+
+// Create .target.folders from the current config's destination_dirs.
+fn init_target_file(conf AppConfig) ! {
+	path := os.join_path(os.getwd(), target_filename)
+
+	if os.exists(path) {
+		return
+	}
+
+	mut lines := []string{}
+	lines << '# target folders — one path per line, empty lines and # comments ignored'
+	for _, dir in conf.destination_dirs {
+		lines << dir
+	}
+	lines << ''
+
+	os.write_file(path, lines.join('\n')) or {
+		return error('cannot write ${path}')
+	}
+}
+
+fn expand_path(path string) string {
+	if path == '~' {
+		return os.home_dir()
+	}
+	if path.starts_with('~/') {
+		return os.home_dir() + path[1..]
+	}
+	return path
+}

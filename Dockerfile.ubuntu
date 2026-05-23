@@ -1,0 +1,23 @@
+# Dynamically linked build on Ubuntu 24.04
+# Produces a binary that depends on system GTK3 packages.
+#
+# Usage:
+#   docker build --network host -f Dockerfile.ubuntu -t simple-pic-viewer-builder .
+#   docker run --rm --network host -v $(pwd):/app simple-pic-viewer-builder
+#
+FROM ubuntu:24.04
+
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    build-essential pkg-config git make \
+    libgtk-3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN git clone --depth 1 https://github.com/vlang/v /opt/v && \
+    cd /opt/v && make && ln -s /opt/v/v /usr/local/bin/v
+
+WORKDIR /app
+
+CMD v -enable-globals \
+    -cflags "$(pkg-config --cflags gtk+-3.0)" \
+    -ldflags "$(pkg-config --libs gtk+-3.0)" \
+    -o /app/simple-pic-viewer .
