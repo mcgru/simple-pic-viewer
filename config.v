@@ -97,8 +97,13 @@ fn load_target_folders_at(dir string) ![]string {
 	mut folders := []string{}
 	for line in data.split('\n') {
 		l := line.trim_space()
-		if l != '' && !l.starts_with('#') {
+		if l == '' || l.starts_with('#') {
+			continue
+		}
+		if l.starts_with('/') || l.starts_with('~') {
 			folders << l
+		} else {
+			folders << os.join_path(dir, l)
 		}
 	}
 
