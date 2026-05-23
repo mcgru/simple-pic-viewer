@@ -298,12 +298,12 @@ fn show_current_image() {
 
 	if os.is_dir(filename) {
 		base := os.base(filename)
-		title := '${host}: ${folder} -- 📁 ${base}/ ${idx_str}'
+		title := '   ${host}: ${folder} -- 📁 ${base}/ ${idx_str}'
 		C.gtk_window_set_title(app.window, &char(title.str))
 		C.gtk_image_clear(app.image)
 	} else {
 		base := os.base(filename)
-		title := '${host}: ${folder} -- ${base} ${idx_str}'
+		title := '   ${host}: ${folder} -- ${base} ${idx_str}'
 		C.gtk_window_set_title(app.window, &char(title.str))
 
 		pixbuf := C.gdk_pixbuf_new_from_file_at_scale(
@@ -515,8 +515,6 @@ fn main() {
 
 	image := C.gtk_image_new()
 	C.gtk_container_add(window, image)
-	C.gtk_widget_set_halign(image, gtk_align_start)
-	C.gtk_widget_set_margin_start(image, 20)
 
 	app.window = window
 	app.image = image
