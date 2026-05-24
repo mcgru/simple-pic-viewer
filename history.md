@@ -85,3 +85,9 @@
 - Заголовок окна: `COPIED filename` / `DELETED filename` на 2 сек
 - `get_event_state()` — чтение модификаторов из GDK-события
 - Обновлён `--help`
+
+## 2026-05-24 — Пустые индексы + новый формат заголовка
+
+- Если в `destination_dirs` пустая строка (пропущенный TGT_FLDR_N) — красная вспышка, `ERROR: no folder assigned to N`
+- Заголовок при копировании: `COPIED to /path`
+- Заголовок при удалении: `DELETED /abs/path/filename`

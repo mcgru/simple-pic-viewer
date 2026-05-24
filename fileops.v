@@ -61,8 +61,8 @@ fn delete_from_folder(src string, dst_dir string) {
 
 	// Success
 	flash_main_window('red')
-	base := os.base(src)
-	title := '   DELETED ' + base
+	expanded_disp := expand_path(dst_dir)
+	title := '   DELETED ' + expanded_disp + '/' + os.base(src)
 	C.gtk_window_set_title(app.window, &char(title.str))
 	C.g_timeout_add(2000, voidptr(restore_title_fn), voidptr(0))
 }

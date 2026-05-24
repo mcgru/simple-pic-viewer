@@ -167,15 +167,17 @@ fn on_key_press(widget voidptr, event voidptr, data voidptr) int {
 
 		if state & 1 != 0 {
 			// Shift+digit: delete from destination folder
-			if app.cur_index >= 0 && app.cur_index < app.files.len && idx < app.config.destination_dirs.len {
+			if app.cur_index >= 0 && app.cur_index < app.files.len && idx < app.config.destination_dirs.len && app.config.destination_dirs[idx] != '' {
 				delete_from_folder(app.files[app.cur_index], app.config.destination_dirs[idx])
+			} else {
+				flash_main_window('red')
 			}
 			return 1
 		}
 
 		// Normal digit: copy (hardlink) to corresponding destination dir
 		if app.cur_index >= 0 && app.cur_index < app.files.len {
-			if idx < app.config.destination_dirs.len {
+			if idx < app.config.destination_dirs.len && app.config.destination_dirs[idx] != '' {
 				exec_copy(app.files[app.cur_index], app.config.destination_dirs[idx], 'link') or {
 					flash_main_window('red')
 					show_error_msg(app.window, 'Failed: ${err.str()}')
@@ -183,15 +185,18 @@ fn on_key_press(widget voidptr, event voidptr, data voidptr) int {
 				}
 				// Success — show feedback
 				flash_main_window('green')
-				base := os.base(app.files[app.cur_index])
-				title := '   COPIED ' + base
+				title := '   COPIED to ' + app.config.destination_dirs[idx]
 				C.gtk_window_set_title(app.window, &char(title.str))
 				C.g_timeout_add(2000, voidptr(restore_title_fn), voidptr(0))
 				return 1
 			}
 		}
-		// Digit out of range or no image — show copy dialog
-		show_copy_dialog('link')
+		// Empty / out-of-range slot — error flash
+		flash_main_window('red')
+		num := (idx + 1).str()
+		title := '   ERROR: no folder assigned to ' + num
+		C.gtk_window_set_title(app.window, &char(title.str))
+		C.g_timeout_add(2000, voidptr(restore_title_fn), voidptr(0))
 		return 1
 	}
 
