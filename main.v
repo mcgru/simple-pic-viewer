@@ -125,6 +125,7 @@ mut:
 
 __global(
 	app AppState
+	config_errors []string
 )
 
 // ============================================================
@@ -585,6 +586,12 @@ fn main() {
 
 	C.g_signal_connect_data(window, c"destroy", voidptr(on_destroy), voidptr(0), voidptr(0), 0)
 	C.g_signal_connect_data(window, c"key-press-event", voidptr(on_key_press), voidptr(0), voidptr(0), 0)
+
+	if config_errors.len > 0 {
+		msg := config_errors.join('\n')
+		show_error_msg(window, msg)
+		config_errors = []
+	}
 
 	show_current_image()
 	C.gtk_widget_show_all(window)

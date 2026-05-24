@@ -53,7 +53,17 @@ fn load_config() AppConfig {
 		val := parts[1..].join('=').trim_space()
 
 		if key.starts_with('TGT_FLDR_') {
-			conf.destination_dirs << val
+			num_str := key['TGT_FLDR_'.len..]
+			num := num_str.int()
+			if num < 1 || num > 9 {
+				config_errors << '${path}: invalid TGT_FLDR_${num_str} = ${val} — must be 1-9'
+				continue
+			}
+			idx := num - 1
+			for conf.destination_dirs.len <= idx {
+				conf.destination_dirs << ''
+			}
+			conf.destination_dirs[idx] = val
 		} else if key == 'COPY_METHOD' {
 			conf.copy_method = val
 		} else if key == 'MOVE_METHOD' {
