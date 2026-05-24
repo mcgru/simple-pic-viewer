@@ -223,12 +223,12 @@ fn on_key_press(widget voidptr, event voidptr, data voidptr) int {
 		return 1
 	}
 
-	if keyval == 67 || keyval == 99 {
+	if keyval == 67 || keyval == 99 || keyval == cyrillic_capital_es || keyval == cyrillic_small_es {
 		show_copy_dialog('link')
 		return 1
 	}
 
-	if keyval == 77 || keyval == 109 {
+	if keyval == 77 || keyval == 109 || keyval == cyrillic_capital_soft || keyval == cyrillic_small_soft {
 		show_copy_dialog(app.config.move_method)
 		return 1
 	}
@@ -456,6 +456,7 @@ fn show_current_image() {
 		base := os.base(filename)
 		title := '   ${folder} ${idx_str} -- ${base}'
 		C.gtk_window_set_title(app.window, &char(title.str))
+		C.gtk_image_clear(app.image)
 
 		pixbuf := C.gdk_pixbuf_new_from_file_at_scale(
 			&char(filename.str),

@@ -1,6 +1,7 @@
 module main
 
 import os
+import crypto.md5
 
 fn exec_copy(src string, dst_dir string, method string) ! {
 	expanded := expand_path(dst_dir)
@@ -11,21 +12,13 @@ fn exec_copy(src string, dst_dir string, method string) ! {
 	match method {
 		'link' {
 			// Try hardlink first, fall back to copy if cross-filesystem
-			res := os.execute('cp -l "${src}" "${dst}"')
-			if res.exit_code == 0 {
-				return
-			}
-			// cross-filesystem or other failure -> try cp -a
-			res2 := os.execute('cp -a "${src}" "${dst}"')
-			if res2.exit_code != 0 {
-				return error(res2.output)
+			os.link(src, dst) or {
+				// cross-filesystem or other failure -> regular copy
+				os.cp(src, dst) or { return err }
 			}
 		}
 		'mv' {
-			res := os.execute('mv "${src}" "${dst}"')
-			if res.exit_code != 0 {
-				return error(res.output)
-			}
+			os.mv(src, dst) or { return err }
 		}
 		else {
 			return error('unknown method: ${method}')
@@ -46,9 +39,24 @@ fn delete_from_folder(src string, dst_dir string) {
 		return
 	}
 
-	// Compare by md5sum
-	src_hash := os.execute('md5sum "' + src + '"').output.split(' ')[0]
-	dst_hash := os.execute('md5sum "' + dst + '"').output.split(' ')[0]
+	// Compare by md5sum (read both files entirely)
+	src_data := os.read_file(src) or {
+		flash_main_window('red')
+		title := '   NO-FILE ' + os.base(src)
+		C.gtk_window_set_title(app.window, &char(title.str))
+		C.g_timeout_add(2000, voidptr(restore_title_fn), voidptr(0))
+		return
+	}
+	dst_data := os.read_file(dst) or {
+		flash_main_window('red')
+		title := '   NO-FILE ' + os.base(dst)
+		C.gtk_window_set_title(app.window, &char(title.str))
+		C.g_timeout_add(2000, voidptr(restore_title_fn), voidptr(0))
+		return
+	}
+
+	src_hash := md5.hexhash(src_data)
+	dst_hash := md5.hexhash(dst_data)
 
 	if src_hash != dst_hash {
 		flash_main_window('red')

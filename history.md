@@ -1,5 +1,11 @@
 # История разработки Simple Pic Viewer
 
+## 2026-05-24 — Shell injection fix + Cyrillic шорткаты + stale image
+
+- `fileops.v`: `os.execute()` заменён на `os.link()`, `os.cp()`, `os.mv()`, `crypto.md5.hexhash()` — устранён shell injection через имена файлов
+- `main.v`: добавлены Cyrillic шорткаты `С`/`с` (Copy) и `Ь`/`ь` (Move) — работали только ASCII
+- `main.v`: `gtk_image_clear()` вызывается и при загрузке файла (не только директории) — не остаётся старого изображения при ошибке загрузки
+
 ## 2026-05-24 — Редактирование папок назначения из диалога
 
 - `DestDir` struct: `path` + `source` + `src_idx` для отслеживания происхождения каждой записи
