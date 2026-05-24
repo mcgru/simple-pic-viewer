@@ -1,6 +1,6 @@
 # target folders — one path per line, empty lines and # comments ignored
 f/f1
 f/f2
-f/f3
-~/Pictures
-~/Desktop
+#f/f3
+#~/Pictures
+#~/Desktop
