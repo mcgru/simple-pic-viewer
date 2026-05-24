@@ -39,7 +39,10 @@ fn delete_from_folder(src string, dst_dir string) {
 
 	if !os.exists(dst) {
 		flash_main_window('red')
-		show_error_msg(app.window, 'Not found in ' + dst_dir + ': ' + os.base(src))
+		expanded_disp := expand_path(dst_dir)
+		title := '   NO-FILE ' + expanded_disp + '/' + os.base(src)
+		C.gtk_window_set_title(app.window, &char(title.str))
+		C.g_timeout_add(2000, voidptr(restore_title_fn), voidptr(0))
 		return
 	}
 
