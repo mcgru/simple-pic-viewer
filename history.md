@@ -66,3 +66,7 @@
 ## 2026-05-24 — Версия в usage
 
 - `--help` теперь первой строкой показывает версию приложения (как `--version`)
+
+## 2026-05-24 — Префикс Version: в --help
+
+- `--help` показывает `Version: simple-pic-viewer X.Y.Z` вместо `simple-pic-viewer X.Y.Z`

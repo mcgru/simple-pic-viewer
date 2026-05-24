@@ -592,7 +592,7 @@ fn main() {
 }
 
 fn usage() string {
-	return 'simple-pic-viewer ${app_version}
+	return 'Version: simple-pic-viewer ${app_version}
 Usage: simple-pic-viewer [OPTIONS] [DIR...]
 
 Minimal GTK3 image viewer with keyboard navigation.
