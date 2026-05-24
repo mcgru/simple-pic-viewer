@@ -1,3 +1,3 @@
 module main
 
-pub const app_version = '1.5.1'
+pub const app_version = '1.5.2'
