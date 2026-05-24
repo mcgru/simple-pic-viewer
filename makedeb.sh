@@ -8,7 +8,7 @@
 set -e
 
 PKG_NAME="simple-pic-viewer"
-PKG_VERSION="1.8.1"
+PKG_VERSION="1.9.0"
 PKG_ARCH="amd64"
 DEB_FILE="${PKG_NAME}_${PKG_VERSION}_${PKG_ARCH}.deb"
 

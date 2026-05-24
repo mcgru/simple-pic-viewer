@@ -1,5 +1,15 @@
 # История разработки Simple Pic Viewer
 
+## 2026-05-24 — Sidebar: список папок назначения слева
+
+- `main.v`: `GtkScrolledWindow` + `GtkListBox` — постоянная панель слева (220px)
+- `main.v`: `rebuild_sidebar()` — перестраивает список из `destination_dirs`
+- `main.v`: `sidebar_select_next()` / `sidebar_select_prev()` — навигация стрелками Up/Down
+- `main.v`: `z`/`Z`/`я`/`Я` — быстрая копия (link) в выбранную папку без диалога
+- `main.v`: Up/Down — навигация по списку (переопределено с выхода из приложения)
+- Горизонтальный `GtkBox` layout: sidebar | image
+- Обновлён `--help` (новые шорткаты)
+
 ## 2026-05-24 — Shell injection fix + Cyrillic шорткаты + stale image
 
 - `fileops.v`: `os.execute()` заменён на `os.link()`, `os.cp()`, `os.mv()`, `crypto.md5.hexhash()` — устранён shell injection через имена файлов

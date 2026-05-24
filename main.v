@@ -52,6 +52,10 @@ fn C.gtk_combo_box_text_append(voidptr, &char, &char)
 fn C.gtk_combo_box_get_active(voidptr) int
 fn C.gtk_combo_box_set_active(voidptr, int)
 
+// ScrolledWindow
+fn C.gtk_scrolled_window_new(voidptr, voidptr) voidptr
+fn C.gtk_scrolled_window_set_policy(voidptr, int, int)
+
 // ListBox
 fn C.gtk_list_box_new() voidptr
 fn C.gtk_list_box_insert(voidptr, voidptr, int)
@@ -116,6 +120,14 @@ const cyrillic_small_soft = 1100
 const cyrillic_capital_u = 1059
 const cyrillic_small_u = 1091
 
+// Arrow keys
+const gdk_key_up = 65362
+const gdk_key_down = 65364
+
+// Cyrillic Ya/ya
+const cyrillic_capital_ya = 1067
+const cyrillic_small_ya = 1103
+
 // ============================================================
 // Application state
 // ============================================================
@@ -132,6 +144,11 @@ mut:
 	dialog_dest_idx     []int
 	dialog_provider     voidptr
 	dialog_window       voidptr
+	sidebar_scroll      voidptr
+	sidebar_list        voidptr
+	sidebar_rows        []voidptr
+	sidebar_labels      []voidptr
+	sidebar_sel         int = -1
 	current_dir         string
 	dir_stack           []string
 	flash_provider      voidptr
@@ -250,6 +267,37 @@ fn on_key_press(widget voidptr, event voidptr, data voidptr) int {
 			navigate_up()
 			return 1
 		}
+	}
+
+	// Sidebar navigation
+	if keyval == u32(gdk_key_up) {
+		sidebar_select_prev()
+		return 1
+	}
+	if keyval == u32(gdk_key_down) {
+		sidebar_select_next()
+		return 1
+	}
+
+	// z / Z / \xd1\x8f / \xd0\xaf — quick copy to sidebar-selected folder
+	if keyval == 122 || keyval == 90 || keyval == cyrillic_small_ya || keyval == cyrillic_capital_ya {
+		if app.cur_index >= 0 && app.cur_index < app.files.len && app.sidebar_sel >= 0 && app.sidebar_sel < app.config.destination_dirs.len {
+			dir := app.config.destination_dirs[app.sidebar_sel]
+			if dir.path != '' {
+				exec_copy(app.files[app.cur_index], dir.path, 'link') or {
+					flash_main_window('red')
+					show_error_msg(app.window, 'Failed: ${err.str()}')
+					return 1
+				}
+				flash_main_window('green')
+				title := '   COPIED to ' + dir.path
+				C.gtk_window_set_title(app.window, &char(title.str))
+				C.g_timeout_add(2000, voidptr(restore_title_fn), voidptr(0))
+				return 1
+			}
+		}
+		flash_main_window('red')
+		return 1
 	}
 
 	return 0
@@ -738,6 +786,99 @@ fn show_delete_dialog() {
 }
 
 // ============================================================
+// Sidebar
+// ============================================================
+
+fn rebuild_sidebar() {
+	if voidptr(app.sidebar_list) == voidptr(0) {
+		return
+	}
+
+	// Destroy old rows
+	for row in app.sidebar_rows {
+		C.gtk_widget_destroy(row)
+	}
+
+	mut rows := []voidptr{}
+	mut labels := []voidptr{}
+
+	if voidptr(app.sidebar_list) != voidptr(0) {
+		for i, dir in app.config.destination_dirs {
+			row := C.gtk_list_box_row_new()
+			hbox := C.gtk_box_new(0, 4)
+
+			label_text := if dir.path != '' {
+				'${i + 1}: ${dir.path}'
+			} else {
+				'${i + 1}: (empty)'
+			}
+			label := C.gtk_label_new(&char(label_text.str))
+			C.gtk_widget_set_halign(label, gtk_align_start)
+			C.gtk_widget_set_margin_start(label, 6)
+			C.gtk_widget_set_margin_end(label, 6)
+
+			C.gtk_box_pack_start(hbox, label, 1, 1, 0)
+			C.gtk_container_add(row, hbox)
+			C.gtk_list_box_insert(app.sidebar_list, row, -1)
+
+			rows << row
+			labels << label
+		}
+	}
+
+	app.sidebar_rows = rows
+	app.sidebar_labels = labels
+
+	// Select first non-empty entry
+	if app.sidebar_sel < 0 || app.sidebar_sel >= rows.len {
+		app.sidebar_sel = 0
+		for i, dir in app.config.destination_dirs {
+			if dir.path != '' {
+				app.sidebar_sel = i
+				break
+			}
+		}
+	}
+	if app.sidebar_sel >= 0 && app.sidebar_sel < rows.len {
+		C.gtk_list_box_select_row(app.sidebar_list, app.sidebar_rows[app.sidebar_sel])
+	} else {
+		app.sidebar_sel = -1
+	}
+}
+
+fn sidebar_select_next() int {
+	if app.sidebar_rows.len == 0 {
+		return -1
+	}
+	mut sel := app.sidebar_sel
+	for _ in 0 .. app.sidebar_rows.len {
+		sel = (sel + 1) % app.sidebar_rows.len
+		if sel < app.config.destination_dirs.len && app.config.destination_dirs[sel].path != '' {
+			app.sidebar_sel = sel
+			C.gtk_list_box_select_row(app.sidebar_list, app.sidebar_rows[sel])
+			return sel
+		}
+	}
+	return -1
+}
+
+fn sidebar_select_prev() int {
+	if app.sidebar_rows.len == 0 {
+		return -1
+	}
+	mut sel := app.sidebar_sel
+	for _ in 0 .. app.sidebar_rows.len {
+		sel = (sel - 1 + app.sidebar_rows.len) % app.sidebar_rows.len
+		if sel < app.config.destination_dirs.len && app.config.destination_dirs[sel].path != '' {
+			app.sidebar_sel = sel
+			C.gtk_list_box_select_row(app.sidebar_list, app.sidebar_rows[sel])
+			return sel
+		}
+	}
+	return -1
+}
+
+// ============================================================
 // Edit destination dialog
 // ============================================================
 
@@ -863,13 +1004,34 @@ fn main() {
 
 	window := C.gtk_window_new(gtk_window_toplevel)
 	C.gtk_window_set_title(window, c"Simple Pic Viewer")
-	C.gtk_window_set_default_size(window, 900, 700)
+	C.gtk_window_set_default_size(window, 1100, 700)
+
+	// Horizontal layout: sidebar | image
+	hbox := C.gtk_box_new(0, 0)
+
+	// Sidebar (scrolled list of destination dirs)
+	scroll := C.gtk_scrolled_window_new(voidptr(0), voidptr(0))
+	C.gtk_scrolled_window_set_policy(scroll, 1, 1) // GTK_POLICY_AUTOMATIC
+	C.gtk_widget_set_size_request(scroll, 220, -1)
+
+	list_box := C.gtk_list_box_new()
+	C.gtk_list_box_set_selection_mode(list_box, gtk_selection_single)
+	C.gtk_container_add(scroll, list_box)
 
 	image := C.gtk_image_new()
-	C.gtk_container_add(window, image)
+
+	C.gtk_box_pack_start(hbox, scroll, 0, 0, 0)
+	C.gtk_box_pack_start(hbox, image, 1, 1, 0)
+
+	C.gtk_container_add(window, hbox)
 
 	app.window = window
 	app.image = image
+	app.sidebar_scroll = scroll
+	app.sidebar_list = list_box
+
+	// Build sidebar after config is fully loaded
+	rebuild_sidebar()
 
 	C.g_signal_connect_data(window, c"destroy", voidptr(on_destroy), voidptr(0), voidptr(0), 0)
 	C.g_signal_connect_data(window, c"key-press-event", voidptr(on_key_press), voidptr(0), voidptr(0), 0)
