@@ -1,5 +1,14 @@
 # История разработки Simple Pic Viewer
 
+## 2026-05-24 — Редактирование папок назначения из диалога
+
+- `DestDir` struct: `path` + `source` + `src_idx` для отслеживания происхождения каждой записи
+- `destination_dirs` переведён с `[]string` на `[]DestDir`
+- `save_dest_dir_to_source()` — сохранение изменений обратно в `.env` (по ключу TGT_FLDR_N) или `.target.folders` (по позиции)
+- В диалогах copy/move/delete: `e`/`E`/`у`/`У`/`F4` — открыть окно редактирования пути
+- `show_edit_dialog()`: GtkEntry с предзаполненным путём, OK → обновление в памяти + в файле + в списке
+- `dialog_path_labels []voidptr` — для live-обновления меток после редактирования
+
 ## 2026-05-23 — Версия через version.v + git tags
 
 - Создан `version.v` с константой `app_version` (module main, коммитится в репозиторий)

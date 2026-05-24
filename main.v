@@ -45,6 +45,7 @@ fn C.gtk_box_new(int, int) voidptr
 fn C.gtk_button_new_with_label(&char) voidptr
 
 fn C.gtk_label_new(&char) voidptr
+fn C.gtk_label_set_text(voidptr, &char)
 
 fn C.gtk_combo_box_text_new() voidptr
 fn C.gtk_combo_box_text_append(voidptr, &char, &char)
@@ -69,6 +70,12 @@ fn C.gtk_widget_set_margin_top(voidptr, int)
 fn C.gtk_widget_set_margin_bottom(voidptr, int)
 fn C.gtk_widget_set_margin_start(voidptr, int)
 fn C.gtk_widget_set_margin_end(voidptr, int)
+fn C.gtk_widget_grab_focus(voidptr)
+
+// Entry
+fn C.gtk_entry_new() voidptr
+fn C.gtk_entry_set_text(voidptr, &char)
+fn C.gtk_entry_get_text(voidptr) &char
 
 // CSS provider (for red flash)
 fn C.gtk_css_provider_new() voidptr
@@ -95,6 +102,7 @@ const gdk_key_return = 65293
 const gdk_key_backspace = 65288
 const gdk_key_f5 = 65469
 const gdk_key_f6 = 65470
+const gdk_key_f4 = 65471
 const gdk_key_f8 = 65472
 const gtk_align_start = 1
 const gtk_selection_single = 1
@@ -105,6 +113,8 @@ const cyrillic_capital_es = 1057
 const cyrillic_small_es = 1089
 const cyrillic_capital_soft = 1068
 const cyrillic_small_soft = 1100
+const cyrillic_capital_u = 1059
+const cyrillic_small_u = 1091
 
 // ============================================================
 // Application state
@@ -112,17 +122,18 @@ const cyrillic_small_soft = 1100
 
 struct AppState {
 mut:
-	files           []string
-	cur_index       int = -1
-	window          voidptr
-	image           voidptr
-	config          AppConfig
-	dialog_rows     []voidptr
-	dialog_provider voidptr
-	dialog_window   voidptr
-	current_dir     string
-	dir_stack       []string
-	flash_provider  voidptr
+	files               []string
+	cur_index           int = -1
+	window              voidptr
+	image               voidptr
+	config              AppConfig
+	dialog_rows         []voidptr
+	dialog_path_labels  []voidptr
+	dialog_provider     voidptr
+	dialog_window       voidptr
+	current_dir         string
+	dir_stack           []string
+	flash_provider      voidptr
 }
 
 __global(
@@ -168,8 +179,8 @@ fn on_key_press(widget voidptr, event voidptr, data voidptr) int {
 
 		if state & 1 != 0 {
 			// Shift+digit: delete from destination folder
-			if app.cur_index >= 0 && app.cur_index < app.files.len && idx < app.config.destination_dirs.len && app.config.destination_dirs[idx] != '' {
-				delete_from_folder(app.files[app.cur_index], app.config.destination_dirs[idx])
+			if app.cur_index >= 0 && app.cur_index < app.files.len && idx < app.config.destination_dirs.len && app.config.destination_dirs[idx].path != '' {
+				delete_from_folder(app.files[app.cur_index], app.config.destination_dirs[idx].path)
 			} else {
 				flash_main_window('red')
 			}
@@ -178,15 +189,15 @@ fn on_key_press(widget voidptr, event voidptr, data voidptr) int {
 
 		// Normal digit: copy (hardlink) to corresponding destination dir
 		if app.cur_index >= 0 && app.cur_index < app.files.len {
-			if idx < app.config.destination_dirs.len && app.config.destination_dirs[idx] != '' {
-				exec_copy(app.files[app.cur_index], app.config.destination_dirs[idx], 'link') or {
+			if idx < app.config.destination_dirs.len && app.config.destination_dirs[idx].path != '' {
+				exec_copy(app.files[app.cur_index], app.config.destination_dirs[idx].path, 'link') or {
 					flash_main_window('red')
 					show_error_msg(app.window, 'Failed: ${err.str()}')
 					return 1
 				}
 				// Success — show feedback
 				flash_main_window('green')
-				title := '   COPIED to ' + app.config.destination_dirs[idx]
+				title := '   COPIED to ' + app.config.destination_dirs[idx].path
 				C.gtk_window_set_title(app.window, &char(title.str))
 				C.g_timeout_add(2000, voidptr(restore_title_fn), voidptr(0))
 				return 1
@@ -258,6 +269,18 @@ fn on_dialog_key(dlg voidptr, event voidptr, list_box voidptr) int {
 			return 1
 		}
 		flash_dialog_red()
+		return 1
+	}
+
+	// e / E / у / У / F4 — edit selected destination
+	if keyval == 69 || keyval == 101 || keyval == cyrillic_capital_u || keyval == cyrillic_small_u || keyval == u32(gdk_key_f4) {
+		sel := C.gtk_list_box_get_selected_row(list_box)
+		if voidptr(sel) != voidptr(0) {
+			idx := C.gtk_list_box_row_get_index(sel)
+			if idx >= 0 && idx < app.config.destination_dirs.len {
+				show_edit_dialog(idx)
+			}
+		}
 		return 1
 	}
 	return 0
@@ -524,11 +547,12 @@ fn show_copy_dialog(method string) {
 	C.gtk_widget_set_size_request(list_box, -1, 280)
 
 	mut rows := []voidptr{}
+	mut path_labels := []voidptr{}
 	for i, dir in app.config.destination_dirs {
 		row := C.gtk_list_box_row_new()
 		hbox := C.gtk_box_new(0, 8)
 
-		path_label := C.gtk_label_new(&char(dir.str))
+		path_label := C.gtk_label_new(&char(dir.path.str))
 		C.gtk_widget_set_halign(path_label, gtk_align_start)
 
 		idx_num := i + 1
@@ -546,8 +570,10 @@ fn show_copy_dialog(method string) {
 		C.gtk_container_add(row, hbox)
 		C.gtk_list_box_insert(list_box, row, -1)
 		rows << row
+		path_labels << path_label
 	}
 	app.dialog_rows = rows
+	app.dialog_path_labels = path_labels
 
 	if rows.len > 0 {
 		C.gtk_list_box_select_row(list_box, rows[0])
@@ -572,7 +598,7 @@ fn show_copy_dialog(method string) {
 		dir_idx := C.gtk_list_box_row_get_index(sel)
 
 		if dir_idx >= 0 && dir_idx < app.config.destination_dirs.len {
-			dst_dir := app.config.destination_dirs[dir_idx]
+			dst_dir := app.config.destination_dirs[dir_idx].path
 			src := app.files[app.cur_index]
 			exec_copy(src, dst_dir, method) or {
 				show_error_msg(dialog, 'Failed: ${err.str()}')
@@ -589,6 +615,7 @@ fn show_copy_dialog(method string) {
 	}
 	app.dialog_window = voidptr(0)
 	app.dialog_rows = []
+	app.dialog_path_labels = []
 
 	C.gtk_widget_destroy(dialog)
 }
@@ -616,14 +643,16 @@ fn show_delete_dialog() {
 	C.gtk_widget_set_size_request(list_box, -1, 280)
 
 	mut rows := []voidptr{}
+	mut path_labels := []voidptr{}
 	for i, dir in app.config.destination_dirs {
-		if dir == '' {
+		if dir.path == '' {
+			path_labels << voidptr(0)
 			continue
 		}
 		row := C.gtk_list_box_row_new()
 		hbox := C.gtk_box_new(0, 8)
 
-		path_label := C.gtk_label_new(&char(dir.str))
+		path_label := C.gtk_label_new(&char(dir.path.str))
 		C.gtk_widget_set_halign(path_label, gtk_align_start)
 
 		idx_num := i + 1
@@ -641,8 +670,10 @@ fn show_delete_dialog() {
 		C.gtk_container_add(row, hbox)
 		C.gtk_list_box_insert(list_box, row, -1)
 		rows << row
+		path_labels << path_label
 	}
 	app.dialog_rows = rows
+	app.dialog_path_labels = path_labels
 
 	if rows.len > 0 {
 		C.gtk_list_box_select_row(list_box, rows[0])
@@ -668,7 +699,7 @@ fn show_delete_dialog() {
 		dir_idx := C.gtk_list_box_row_get_index(sel)
 
 		if dir_idx >= 0 && dir_idx < app.config.destination_dirs.len {
-			dst_dir := app.config.destination_dirs[dir_idx]
+			dst_dir := app.config.destination_dirs[dir_idx].path
 			src := app.files[app.cur_index]
 			delete_from_folder(src, dst_dir)
 		}
@@ -682,8 +713,56 @@ fn show_delete_dialog() {
 	}
 	app.dialog_window = voidptr(0)
 	app.dialog_rows = []
+	app.dialog_path_labels = []
 
 	C.gtk_widget_destroy(dialog)
+}
+
+// ============================================================
+// Edit destination dialog
+// ============================================================
+
+fn show_edit_dialog(idx int) {
+	old_path := app.config.destination_dirs[idx].path
+
+	dlg := C.gtk_dialog_new()
+	C.gtk_window_set_title(dlg, c"Edit destination folder")
+	C.gtk_window_set_transient_for(dlg, app.dialog_window)
+	C.gtk_window_set_modal(dlg, 1)
+	C.gtk_window_set_default_size(dlg, 400, 120)
+
+	content := C.gtk_dialog_get_content_area(dlg)
+
+	entry := C.gtk_entry_new()
+	C.gtk_entry_set_text(entry, &char(old_path.str))
+	C.gtk_widget_grab_focus(entry)
+	C.gtk_box_pack_start(content, entry, 1, 1, 10)
+
+	C.gtk_dialog_add_button(dlg, c"_Cancel", gtk_response_cancel)
+	C.gtk_dialog_add_button(dlg, c"_OK", copy_response_id)
+
+	C.gtk_widget_show_all(dlg)
+
+	response := C.gtk_dialog_run(dlg)
+
+	if response == copy_response_id {
+		c_text := C.gtk_entry_get_text(entry)
+		new_path := unsafe { cstring_to_vstring(c_text) }
+
+		if new_path != old_path {
+			app.config.destination_dirs[idx].path = new_path
+			save_dest_dir_to_source(idx, new_path)
+
+			if idx < app.dialog_path_labels.len {
+				lbl := app.dialog_path_labels[idx]
+				if voidptr(lbl) != voidptr(0) {
+					C.gtk_label_set_text(lbl, &char(new_path.str))
+				}
+			}
+		}
+	}
+
+	C.gtk_widget_destroy(dlg)
 }
 
 // ============================================================
@@ -720,13 +799,13 @@ fn main() {
 	// Priority chain: lowest → highest. Each step overwrites by index.
 
 	// 1. ~/.config/simple-pic-viewer/.target.folders
-	home_target := load_target_folders_at(config_dir()) or { []string{} }
+	home_target := load_target_folders_at(config_dir()) or { []DestDir{} }
 	if home_target.len > 0 {
 		merge_dirs(mut app.config.destination_dirs, home_target)
 	}
 
 	// 2. CWD/.target.folders
-	cwd_target := load_target_folders() or { []string{} }
+	cwd_target := load_target_folders() or { []DestDir{} }
 	if cwd_target.len > 0 {
 		merge_dirs(mut app.config.destination_dirs, cwd_target)
 	}
@@ -744,7 +823,7 @@ fn main() {
 			if walk_path == abs_start {
 				break
 			}
-			step_target := load_target_folders_at(walk_path) or { []string{} }
+			step_target := load_target_folders_at(walk_path) or { []DestDir{} }
 			if step_target.len > 0 {
 				merge_dirs(mut app.config.destination_dirs, step_target)
 			}
@@ -753,7 +832,7 @@ fn main() {
 
 	// 4. start_dir/.target.folders (highest)
 	if abs_start != abs_cwd {
-		dir_target := load_target_folders_at(start_dir) or { []string{} }
+		dir_target := load_target_folders_at(start_dir) or { []DestDir{} }
 		if dir_target.len > 0 {
 			merge_dirs(mut app.config.destination_dirs, dir_target)
 		}
@@ -809,6 +888,9 @@ Keys:
   Esc             Quit
   Enter           Enter a directory (when directory navigation is enabled)
   Backspace       Go up to parent directory
+
+Dialog keys:
+  e / E / Ñ / Ð£ / F4  Edit selected destination folder
 
 Configuration:
   ~/.config/simple-pic-viewer/.env — TGT_FLDR_*, COPY_METHOD, MOVE_METHOD
