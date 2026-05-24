@@ -13,5 +13,8 @@ dloads/
 # claude code session state
 .claude/
 
+# claude code resume state
+LAST.resume
+
 # downloaded artifacts
 latest-releases.yaml
