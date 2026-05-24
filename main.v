@@ -90,6 +90,8 @@ fn C.gtk_style_context_remove_provider(voidptr, voidptr)
 
 // Timer
 fn C.g_timeout_add(int, voidptr, voidptr) int
+fn C.gtk_widget_create_pango_layout(voidptr, &char) voidptr
+fn C.pango_layout_get_pixel_size(voidptr, &int, &int)
 
 // ============================================================
 // Constants
@@ -279,18 +281,31 @@ fn on_key_press(widget voidptr, event voidptr, data voidptr) int {
 		return 1
 	}
 
+	// e / E / у / У / F4 — edit sidebar-selected destination
+	if keyval == 69 || keyval == 101 || keyval == cyrillic_capital_u || keyval == cyrillic_small_u || keyval == u32(gdk_key_f4) {
+		if app.sidebar_sel >= 0 && app.sidebar_sel < app.config.destination_dirs.len {
+			show_edit_dialog(app.sidebar_sel)
+			rebuild_sidebar()
+		}
+		return 1
+	}
+
 	// z / Z / \xd1\x8f / \xd0\xaf — quick copy to sidebar-selected folder
+	// If the selected slot is empty, open edit dialog instead
 	if keyval == 122 || keyval == 90 || keyval == cyrillic_small_ya || keyval == cyrillic_capital_ya {
-		if app.cur_index >= 0 && app.cur_index < app.files.len && app.sidebar_sel >= 0 && app.sidebar_sel < app.config.destination_dirs.len {
-			dir := app.config.destination_dirs[app.sidebar_sel]
-			if dir.path != '' {
-				exec_copy(app.files[app.cur_index], dir.path, 'link') or {
+		if app.sidebar_sel >= 0 && app.sidebar_sel < app.config.destination_dirs.len {
+			if app.config.destination_dirs[app.sidebar_sel].path == '' {
+				show_edit_dialog(app.sidebar_sel)
+				rebuild_sidebar()
+				return 1
+			} else if app.cur_index >= 0 && app.cur_index < app.files.len {
+				exec_copy(app.files[app.cur_index], app.config.destination_dirs[app.sidebar_sel].path, 'link') or {
 					flash_main_window('red')
 					show_error_msg(app.window, 'Failed: ${err.str()}')
 					return 1
 				}
 				flash_main_window('green')
-				title := '   COPIED to ' + dir.path
+				title := '   COPIED to ' + app.config.destination_dirs[app.sidebar_sel].path
 				C.gtk_window_set_title(app.window, &char(title.str))
 				C.g_timeout_add(2000, voidptr(restore_title_fn), voidptr(0))
 				return 1
@@ -807,75 +822,77 @@ fn rebuild_sidebar() {
 			row := C.gtk_list_box_row_new()
 			hbox := C.gtk_box_new(0, 4)
 
-			label_text := if dir.path != '' {
-				'${i + 1}: ${dir.path}'
-			} else {
-				'${i + 1}: (empty)'
-			}
-			label := C.gtk_label_new(&char(label_text.str))
-			C.gtk_widget_set_halign(label, gtk_align_start)
-			C.gtk_widget_set_margin_start(label, 6)
-			C.gtk_widget_set_margin_end(label, 6)
+			path_text := if dir.path != '' { dir.path } else { '' }
+			path_label := C.gtk_label_new(&char(path_text.str))
+			C.gtk_widget_set_halign(path_label, gtk_align_start)
+			C.gtk_widget_set_margin_start(path_label, 6)
 
-			C.gtk_box_pack_start(hbox, label, 1, 1, 0)
+			num_text := ':${i + 1}'
+			num_label := C.gtk_label_new(&char(num_text.str))
+			C.gtk_widget_set_margin_end(num_label, 6)
+
+			C.gtk_box_pack_start(hbox, path_label, 1, 1, 0)
+			C.gtk_box_pack_end(hbox, num_label, 0, 0, 4)
 			C.gtk_container_add(row, hbox)
 			C.gtk_list_box_insert(app.sidebar_list, row, -1)
 
 			rows << row
-			labels << label
+			labels << path_label
 		}
 	}
 
 	app.sidebar_rows = rows
 	app.sidebar_labels = labels
 
-	// Select first non-empty entry
+	// Select first entry (may be empty, user can edit it)
 	if app.sidebar_sel < 0 || app.sidebar_sel >= rows.len {
 		app.sidebar_sel = 0
-		for i, dir in app.config.destination_dirs {
-			if dir.path != '' {
-				app.sidebar_sel = i
-				break
-			}
-		}
 	}
 	if app.sidebar_sel >= 0 && app.sidebar_sel < rows.len {
 		C.gtk_list_box_select_row(app.sidebar_list, app.sidebar_rows[app.sidebar_sel])
 	} else {
 		app.sidebar_sel = -1
 	}
+
+	// Auto-size sidebar width using Pango
+	mut max_px := 200
+	for i, _ in app.sidebar_labels {
+		text := app.config.destination_dirs[i].path
+		layout := C.gtk_widget_create_pango_layout(app.sidebar_scroll, &char(text.str))
+		mut tw := 0
+		C.pango_layout_get_pixel_size(layout, &tw, voidptr(0))
+		C.g_object_unref(layout)
+
+		num_txt := ':${i + 1}'
+		layout2 := C.gtk_widget_create_pango_layout(app.sidebar_scroll, &char(num_txt.str))
+		mut nw := 0
+		C.pango_layout_get_pixel_size(layout2, &nw, voidptr(0))
+		C.g_object_unref(layout2)
+
+		total := tw + nw + 48
+		if total > max_px {
+			max_px = total
+		}
+	}
+	C.gtk_widget_set_size_request(app.sidebar_scroll, max_px, -1)
 }
 
 fn sidebar_select_next() int {
 	if app.sidebar_rows.len == 0 {
 		return -1
 	}
-	mut sel := app.sidebar_sel
-	for _ in 0 .. app.sidebar_rows.len {
-		sel = (sel + 1) % app.sidebar_rows.len
-		if sel < app.config.destination_dirs.len && app.config.destination_dirs[sel].path != '' {
-			app.sidebar_sel = sel
-			C.gtk_list_box_select_row(app.sidebar_list, app.sidebar_rows[sel])
-			return sel
-		}
-	}
-	return -1
+	app.sidebar_sel = (app.sidebar_sel + 1) % app.sidebar_rows.len
+	C.gtk_list_box_select_row(app.sidebar_list, app.sidebar_rows[app.sidebar_sel])
+	return app.sidebar_sel
 }
 
 fn sidebar_select_prev() int {
 	if app.sidebar_rows.len == 0 {
 		return -1
 	}
-	mut sel := app.sidebar_sel
-	for _ in 0 .. app.sidebar_rows.len {
-		sel = (sel - 1 + app.sidebar_rows.len) % app.sidebar_rows.len
-		if sel < app.config.destination_dirs.len && app.config.destination_dirs[sel].path != '' {
-			app.sidebar_sel = sel
-			C.gtk_list_box_select_row(app.sidebar_list, app.sidebar_rows[sel])
-			return sel
-		}
-	}
-	return -1
+	app.sidebar_sel = (app.sidebar_sel - 1 + app.sidebar_rows.len) % app.sidebar_rows.len
+	C.gtk_list_box_select_row(app.sidebar_list, app.sidebar_rows[app.sidebar_sel])
+	return app.sidebar_sel
 }
 
 // ============================================================
@@ -1066,12 +1083,14 @@ Keys:
   C / С / F5       Copy (link) current image to selected folder
   M / Ь / F6       Move current image to selected folder
   D / В / F8       Delete from folder (MD5-verified, with dialog)
+  ↑ ↓             Navigate sidebar destination list
+  z / Z / я / Я    Quick copy (link) to sidebar-selected folder
+  e / E / у / У / F4  Edit sidebar-selected destination folder
   Esc             Quit
   Enter           Enter a directory (when directory navigation is enabled)
   Backspace       Go up to parent directory
 
-Dialog keys:
-  e / E / Ñ / Ð£ / F4  Edit selected destination folder
+
 
 Configuration:
   ~/.config/simple-pic-viewer/.env — TGT_FLDR_*, COPY_METHOD, MOVE_METHOD
