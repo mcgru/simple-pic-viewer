@@ -875,6 +875,7 @@ fn rebuild_sidebar() {
 		}
 	}
 	C.gtk_widget_set_size_request(app.sidebar_scroll, max_px, -1)
+	C.gtk_widget_show_all(app.sidebar_scroll)
 }
 
 fn sidebar_select_next() int {
