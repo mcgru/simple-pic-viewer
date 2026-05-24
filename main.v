@@ -592,7 +592,8 @@ fn main() {
 }
 
 fn usage() string {
-	return 'Usage: simple-pic-viewer [OPTIONS] [DIR...]
+	return 'simple-pic-viewer ${app_version}
+Usage: simple-pic-viewer [OPTIONS] [DIR...]
 
 Minimal GTK3 image viewer with keyboard navigation.
 Supports PNG, JPEG, TIFF images.
