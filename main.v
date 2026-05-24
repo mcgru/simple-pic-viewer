@@ -150,6 +150,22 @@ fn on_key_press(widget voidptr, event voidptr, data voidptr) int {
 		return 1
 	}
 
+	// Digits 1-9: quick copy (hardlink) to corresponding destination dir
+	if keyval >= 49 && keyval <= 57 {
+		if app.cur_index >= 0 && app.cur_index < app.files.len {
+			idx := int(keyval - 49)
+			if idx < app.config.destination_dirs.len {
+				exec_copy(app.files[app.cur_index], app.config.destination_dirs[idx], 'link') or {
+					show_error_msg(app.window, 'Failed: ${err.str()}')
+				}
+				return 1
+			}
+		}
+		// Digit out of range or no image — show copy dialog
+		show_copy_dialog('link')
+		return 1
+	}
+
 	if keyval == 67 || keyval == 99 {
 		show_copy_dialog('link')
 		return 1
@@ -588,6 +604,7 @@ Options:
 
 Keys:
   ← →             Previous / next image
+  1-9             Quick copy (hardlink) to folder 1-9 by index
   C / С / F5       Copy (link) current image to selected folder
   M / Ь / F6       Move current image to selected folder
   Esc             Quit
@@ -597,6 +614,12 @@ Keys:
 Configuration:
   ~/.config/simple-pic-viewer/.env — TGT_FLDR_*, COPY_METHOD, MOVE_METHOD
   ./.target.folders — per-project folder list (overrides .env)
+
+Libs (build):
+  sudo apt install build-essential pkg-config git libgtk-3-dev
+Libs (runtime):
+  sudo apt install libgtk-3-0 libgdk-pixbuf-2.0-0 gdk-pixbuf-tiff
+V compiler:  https://github.com/vlang/v
 
 Examples:
   simple-pic-viewer
