@@ -129,6 +129,7 @@ mut:
 	config              AppConfig
 	dialog_rows         []voidptr
 	dialog_path_labels  []voidptr
+	dialog_dest_idx     []int
 	dialog_provider     voidptr
 	dialog_window       voidptr
 	current_dir         string
@@ -276,9 +277,12 @@ fn on_dialog_key(dlg voidptr, event voidptr, list_box voidptr) int {
 	if keyval == 69 || keyval == 101 || keyval == cyrillic_capital_u || keyval == cyrillic_small_u || keyval == u32(gdk_key_f4) {
 		sel := C.gtk_list_box_get_selected_row(list_box)
 		if voidptr(sel) != voidptr(0) {
-			idx := C.gtk_list_box_row_get_index(sel)
-			if idx >= 0 && idx < app.config.destination_dirs.len {
-				show_edit_dialog(idx)
+			row_idx := C.gtk_list_box_row_get_index(sel)
+			if row_idx >= 0 && row_idx < app.dialog_dest_idx.len {
+				idx := app.dialog_dest_idx[row_idx]
+				if idx >= 0 && idx < app.config.destination_dirs.len {
+					show_edit_dialog(idx)
+				}
 			}
 		}
 		return 1
@@ -548,6 +552,7 @@ fn show_copy_dialog(method string) {
 
 	mut rows := []voidptr{}
 	mut path_labels := []voidptr{}
+	mut dest_indices := []int{}
 	for i, dir in app.config.destination_dirs {
 		row := C.gtk_list_box_row_new()
 		hbox := C.gtk_box_new(0, 8)
@@ -571,9 +576,11 @@ fn show_copy_dialog(method string) {
 		C.gtk_list_box_insert(list_box, row, -1)
 		rows << row
 		path_labels << path_label
+		dest_indices << i
 	}
 	app.dialog_rows = rows
 	app.dialog_path_labels = path_labels
+	app.dialog_dest_idx = dest_indices
 
 	if rows.len > 0 {
 		C.gtk_list_box_select_row(list_box, rows[0])
@@ -597,11 +604,14 @@ fn show_copy_dialog(method string) {
 		sel := C.gtk_list_box_get_selected_row(list_box)
 		dir_idx := C.gtk_list_box_row_get_index(sel)
 
-		if dir_idx >= 0 && dir_idx < app.config.destination_dirs.len {
-			dst_dir := app.config.destination_dirs[dir_idx].path
-			src := app.files[app.cur_index]
-			exec_copy(src, dst_dir, method) or {
-				show_error_msg(dialog, 'Failed: ${err.str()}')
+		if dir_idx >= 0 && dir_idx < app.dialog_dest_idx.len {
+			idx := app.dialog_dest_idx[dir_idx]
+			if idx >= 0 && idx < app.config.destination_dirs.len {
+				dst_dir := app.config.destination_dirs[idx].path
+				src := app.files[app.cur_index]
+				exec_copy(src, dst_dir, method) or {
+					show_error_msg(dialog, 'Failed: ${err.str()}')
+				}
 			}
 		}
 	}
@@ -616,6 +626,7 @@ fn show_copy_dialog(method string) {
 	app.dialog_window = voidptr(0)
 	app.dialog_rows = []
 	app.dialog_path_labels = []
+	app.dialog_dest_idx = []
 
 	C.gtk_widget_destroy(dialog)
 }
@@ -644,6 +655,7 @@ fn show_delete_dialog() {
 
 	mut rows := []voidptr{}
 	mut path_labels := []voidptr{}
+	mut dest_indices := []int{}
 	for i, dir in app.config.destination_dirs {
 		if dir.path == '' {
 			path_labels << voidptr(0)
@@ -671,9 +683,11 @@ fn show_delete_dialog() {
 		C.gtk_list_box_insert(list_box, row, -1)
 		rows << row
 		path_labels << path_label
+		dest_indices << i
 	}
 	app.dialog_rows = rows
 	app.dialog_path_labels = path_labels
+	app.dialog_dest_idx = dest_indices
 
 	if rows.len > 0 {
 		C.gtk_list_box_select_row(list_box, rows[0])
@@ -698,10 +712,13 @@ fn show_delete_dialog() {
 		sel := C.gtk_list_box_get_selected_row(list_box)
 		dir_idx := C.gtk_list_box_row_get_index(sel)
 
-		if dir_idx >= 0 && dir_idx < app.config.destination_dirs.len {
-			dst_dir := app.config.destination_dirs[dir_idx].path
-			src := app.files[app.cur_index]
-			delete_from_folder(src, dst_dir)
+		if dir_idx >= 0 && dir_idx < app.dialog_dest_idx.len {
+			idx := app.dialog_dest_idx[dir_idx]
+			if idx >= 0 && idx < app.config.destination_dirs.len {
+				dst_dir := app.config.destination_dirs[idx].path
+				src := app.files[app.cur_index]
+				delete_from_folder(src, dst_dir)
+			}
 		}
 	}
 
@@ -714,6 +731,7 @@ fn show_delete_dialog() {
 	app.dialog_window = voidptr(0)
 	app.dialog_rows = []
 	app.dialog_path_labels = []
+	app.dialog_dest_idx = []
 
 	C.gtk_widget_destroy(dialog)
 }
