@@ -121,6 +121,7 @@ mut:
 	dialog_window   voidptr
 	current_dir     string
 	dir_stack       []string
+	flash_provider  voidptr
 }
 
 __global(
@@ -131,6 +132,14 @@ __global(
 // ============================================================
 // Callbacks
 // ============================================================
+
+@[export: 'restore_title_fn']
+fn restore_title_fn(data voidptr) int {
+	if voidptr(app.window) != voidptr(0) {
+		show_current_image()
+	}
+	return 0
+}
 
 @[export: 'on_destroy']
 fn on_destroy(widget voidptr, data voidptr) {
@@ -151,14 +160,33 @@ fn on_key_press(widget voidptr, event voidptr, data voidptr) int {
 		return 1
 	}
 
-	// Digits 1-9: quick copy (hardlink) to corresponding destination dir
+	// Digits 1-9: copy; Shift+digit: delete from destination folder
 	if keyval >= 49 && keyval <= 57 {
+		idx := int(keyval - 49)
+		state := get_event_state(event)
+
+		if state & 1 != 0 {
+			// Shift+digit: delete from destination folder
+			if app.cur_index >= 0 && app.cur_index < app.files.len && idx < app.config.destination_dirs.len {
+				delete_from_folder(app.files[app.cur_index], app.config.destination_dirs[idx])
+			}
+			return 1
+		}
+
+		// Normal digit: copy (hardlink) to corresponding destination dir
 		if app.cur_index >= 0 && app.cur_index < app.files.len {
-			idx := int(keyval - 49)
 			if idx < app.config.destination_dirs.len {
 				exec_copy(app.files[app.cur_index], app.config.destination_dirs[idx], 'link') or {
+					flash_main_window('red')
 					show_error_msg(app.window, 'Failed: ${err.str()}')
+					return 1
 				}
+				// Success — show feedback
+				flash_main_window('green')
+				base := os.base(app.files[app.cur_index])
+				title := '   COPIED ' + base
+				C.gtk_window_set_title(app.window, &char(title.str))
+				C.g_timeout_add(2000, voidptr(restore_title_fn), voidptr(0))
 				return 1
 			}
 		}
@@ -230,6 +258,33 @@ fn unflash_dialog(data voidptr) int {
 	return 0
 }
 
+fn unflash_main_window(data voidptr) int {
+	if voidptr(app.flash_provider) != voidptr(0) {
+		ctx := C.gtk_widget_get_style_context(app.window)
+		C.gtk_style_context_remove_provider(ctx, app.flash_provider)
+		C.g_object_unref(app.flash_provider)
+		app.flash_provider = voidptr(0)
+	}
+	return 0
+}
+
+fn flash_main_window(color string) {
+	if voidptr(app.flash_provider) != voidptr(0) {
+		ctx := C.gtk_widget_get_style_context(app.window)
+		C.gtk_style_context_remove_provider(ctx, app.flash_provider)
+		C.g_object_unref(app.flash_provider)
+		app.flash_provider = voidptr(0)
+	}
+	provider := C.gtk_css_provider_new()
+	css := '#main-window { background-color: ' + color + '; }'
+	C.gtk_css_provider_load_from_data(provider, &char(css.str), -1, voidptr(0))
+	C.gtk_widget_set_name(app.window, c"main-window")
+	ctx := C.gtk_widget_get_style_context(app.window)
+	C.gtk_style_context_add_provider(ctx, provider, css_provider_priority)
+	app.flash_provider = provider
+	C.g_timeout_add(500, voidptr(unflash_main_window), voidptr(0))
+}
+
 fn flash_dialog_red() {
 	if voidptr(app.dialog_provider) != voidptr(0) {
 		return
@@ -265,6 +320,13 @@ fn get_keyval(event voidptr) u32 {
 	unsafe {
 		ke := &GdkEventKeyFields(event)
 		return ke.keyval
+	}
+}
+
+fn get_event_state(event voidptr) u32 {
+	unsafe {
+		ke := &GdkEventKeyFields(event)
+		return ke.state_val
 	}
 }
 
@@ -613,6 +675,7 @@ Options:
 Keys:
   ← →             Previous / next image
   1-9             Quick copy (hardlink) to folder 1-9 by index
+  Shift+1..9       Delete from folder 1-9 (verified by MD5)
   C / С / F5       Copy (link) current image to selected folder
   M / Ь / F6       Move current image to selected folder
   Esc             Quit
