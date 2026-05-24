@@ -91,3 +91,11 @@
 - Если в `destination_dirs` пустая строка (пропущенный TGT_FLDR_N) — красная вспышка, `ERROR: no folder assigned to N`
 - Заголовок при копировании: `COPIED to /path`
 - Заголовок при удалении: `DELETED /abs/path/filename`
+## 2026-05-24 — Delete dialog (D/В/F8) + починка Shift+digit
+
+- Shift+digit не работал из-за смены keyval при зажатом Shift (3→# и т.д.)
+- digit_idx(): маппинг shifted (US) и unshifted keyvals в 0-8
+- D, В (кириллица), F8 — открывают диалог удаления с выбором папки
+- show_delete_dialog(): аналог show_copy_dialog(), вызывает delete_from_folder()
+- --help: добавлена строка D / В / F8
+

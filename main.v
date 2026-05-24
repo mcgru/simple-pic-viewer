@@ -95,6 +95,7 @@ const gdk_key_return = 65293
 const gdk_key_backspace = 65288
 const gdk_key_f5 = 65469
 const gdk_key_f6 = 65470
+const gdk_key_f8 = 65472
 const gtk_align_start = 1
 const gtk_selection_single = 1
 const css_provider_priority = 800
@@ -161,8 +162,8 @@ fn on_key_press(widget voidptr, event voidptr, data voidptr) int {
 	}
 
 	// Digits 1-9: copy; Shift+digit: delete from destination folder
-	if keyval >= 49 && keyval <= 57 {
-		idx := int(keyval - 49)
+	idx := digit_idx(keyval)
+	if idx >= 0 {
 		state := get_event_state(event)
 
 		if state & 1 != 0 {
@@ -197,6 +198,16 @@ fn on_key_press(widget voidptr, event voidptr, data voidptr) int {
 		title := '   ERROR: no folder assigned to ' + num
 		C.gtk_window_set_title(app.window, &char(title.str))
 		C.g_timeout_add(2000, voidptr(restore_title_fn), voidptr(0))
+		return 1
+	}
+
+	// D / В / F8: delete dialog
+	if keyval == 68 || keyval == 100 || keyval == u32(gdk_key_f8) {
+		show_delete_dialog()
+		return 1
+	}
+	if keyval == 1042 || keyval == 1074 {
+		show_delete_dialog()
 		return 1
 	}
 
@@ -332,6 +343,24 @@ fn get_event_state(event voidptr) u32 {
 	unsafe {
 		ke := &GdkEventKeyFields(event)
 		return ke.state_val
+	}
+}
+
+fn digit_idx(keyval u32) int {
+	if keyval >= 49 && keyval <= 57 {
+		return int(keyval - 49)
+	}
+	match keyval {
+		33 { return 0 }
+		64 { return 1 }
+		35 { return 2 }
+		36 { return 3 }
+		37 { return 4 }
+		94 { return 5 }
+		38 { return 6 }
+		42 { return 7 }
+		40 { return 8 }
+		else { return -1 }
 	}
 }
 
@@ -564,6 +593,99 @@ fn show_copy_dialog(method string) {
 	C.gtk_widget_destroy(dialog)
 }
 
+fn show_delete_dialog() {
+	if app.cur_index < 0 || app.cur_index >= app.files.len || app.config.destination_dirs.len == 0 {
+		return
+	}
+
+	title := 'delete -- select destination'
+	dialog := C.gtk_dialog_new()
+	C.gtk_window_set_title(dialog, &char(title.str))
+	C.gtk_window_set_transient_for(dialog, app.window)
+	C.gtk_window_set_modal(dialog, 1)
+	C.gtk_window_set_default_size(dialog, 420, 300)
+
+	app.dialog_window = dialog
+	app.dialog_provider = voidptr(0)
+
+	content := C.gtk_dialog_get_content_area(dialog)
+
+	// ListBox for destinations
+	list_box := C.gtk_list_box_new()
+	C.gtk_list_box_set_selection_mode(list_box, gtk_selection_single)
+	C.gtk_widget_set_size_request(list_box, -1, 280)
+
+	mut rows := []voidptr{}
+	for i, dir in app.config.destination_dirs {
+		if dir == '' {
+			continue
+		}
+		row := C.gtk_list_box_row_new()
+		hbox := C.gtk_box_new(0, 8)
+
+		path_label := C.gtk_label_new(&char(dir.str))
+		C.gtk_widget_set_halign(path_label, gtk_align_start)
+
+		idx_num := i + 1
+		num_str := if idx_num < 10 { '  ' + idx_num.str() } else { '' }
+		num_label := C.gtk_label_new(&char(num_str.str))
+
+		C.gtk_box_pack_start(hbox, path_label, 1, 1, 0)
+		C.gtk_box_pack_end(hbox, num_label, 0, 0, 8)
+
+		C.gtk_widget_set_margin_top(hbox, 4)
+		C.gtk_widget_set_margin_bottom(hbox, 4)
+		C.gtk_widget_set_margin_start(hbox, 8)
+		C.gtk_widget_set_margin_end(hbox, 8)
+
+		C.gtk_container_add(row, hbox)
+		C.gtk_list_box_insert(list_box, row, -1)
+		rows << row
+	}
+	app.dialog_rows = rows
+
+	if rows.len > 0 {
+		C.gtk_list_box_select_row(list_box, rows[0])
+	} else {
+		C.gtk_widget_destroy(dialog)
+		return
+	}
+
+	C.gtk_box_pack_start(content, list_box, 1, 1, 5)
+
+	// Buttons
+	C.gtk_dialog_add_button(dialog, c"_Cancel", gtk_response_cancel)
+	C.gtk_dialog_add_button(dialog, c"_OK", copy_response_id)
+
+	C.g_signal_connect_data(dialog, c"key-press-event", voidptr(on_dialog_key), list_box, voidptr(0), 0)
+
+	C.gtk_widget_show_all(dialog)
+
+	response := C.gtk_dialog_run(dialog)
+
+	if response == copy_response_id {
+		sel := C.gtk_list_box_get_selected_row(list_box)
+		dir_idx := C.gtk_list_box_row_get_index(sel)
+
+		if dir_idx >= 0 && dir_idx < app.config.destination_dirs.len {
+			dst_dir := app.config.destination_dirs[dir_idx]
+			src := app.files[app.cur_index]
+			delete_from_folder(src, dst_dir)
+		}
+	}
+
+	if voidptr(app.dialog_provider) != voidptr(0) {
+		ctx := C.gtk_widget_get_style_context(dialog)
+		C.gtk_style_context_remove_provider(ctx, app.dialog_provider)
+		C.g_object_unref(app.dialog_provider)
+		app.dialog_provider = voidptr(0)
+	}
+	app.dialog_window = voidptr(0)
+	app.dialog_rows = []
+
+	C.gtk_widget_destroy(dialog)
+}
+
 // ============================================================
 // Entry point
 // ============================================================
@@ -683,6 +805,7 @@ Keys:
   Shift+1..9       Delete from folder 1-9 (verified by MD5)
   C / С / F5       Copy (link) current image to selected folder
   M / Ь / F6       Move current image to selected folder
+  D / В / F8       Delete from folder (MD5-verified, with dialog)
   Esc             Quit
   Enter           Enter a directory (when directory navigation is enabled)
   Backspace       Go up to parent directory
